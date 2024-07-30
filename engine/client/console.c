@@ -66,7 +66,7 @@ static cvar_t		con_notify_x = CVAR("con_notify_x","0");
 static cvar_t		con_notify_y = CVAR("con_notify_y","0");
 static cvar_t		con_notify_w = CVAR("con_notify_w","1");
 static cvar_t		con_centernotify = CVAR("con_centernotify", "0");
-static cvar_t		con_displaypossibilities = CVAR("con_displaypossibilities", "1");
+cvar_t				con_displaypossibilities = CVAR("con_displaypossibilities", "1");
 static cvar_t		con_showcompletion = CVAR("con_showcompletion", "1");
 static cvar_t		con_maxlines = CVAR("con_maxlines", "1024");
 cvar_t				cl_chatmode = CVARD("cl_chatmode", "2", "0(nq) - everything is assumed to be a console command. prefix with 'say', or just use a messagemode bind\n1(q3) - everything is assumed to be chat, unless its prefixed with a /\n2(qw) - anything explicitly recognised as a command will be used as a command, anything unrecognised will be a chat message.\n/ prefix is supported in all cases.\nctrl held when pressing enter always makes any implicit chat into team chat instead.");
@@ -1621,13 +1621,15 @@ int Con_DrawInput (console_t *con, qboolean focused, int left, int right, int y,
 	}
 
 	/*just above that, we have the tab completion list*/
-	if (con_commandmatch && con_displaypossibilities.value)
+	if (con_commandmatch && con_displaypossibilities.value && con_displaypossibilities.value != 3)
 	{
 		conchar_t *end, *s;
 		const char *cmd;//, *desc;
-		int cmdstart;
+		char *varstr, *tabOrReturn;
+		int cmdstart, notDefault;
 		size_t newlen;
 		cmd_completion_t *c;
+		cvar_t *var;
 		cmdstart = text[0] == '/'?1:0;
 		end = maskedtext;
 
@@ -1646,15 +1648,18 @@ int Con_DrawInput (console_t *con, qboolean focused, int left, int right, int y,
 		for (i = 0; i < c->num; i++)
 		{
 			int col = (con_commandmatch == i+1)?3:2;
+			char *color;
 			s = (conchar_t*)(con->completionline+1);
 
 			//note: if cl_chatmode is 0, then we shouldn't show the leading /, however that is how the console link stuff recognises it as command text, so we always display it.
 			cmd = c->completions[i].text;
-//			desc = c->completions[i].desc;
-//			if (desc)
-//				end = COM_ParseFunString((COLOR_GREEN<<CON_FGSHIFT), va("^[^%i/%s\\tip\\%s^]\t", col, cmd, desc), s+con->completionline->length, (con->completionline->maxlength-con->completionline->length)*sizeof(maskedtext[0]), true);
-//			else
-				end = COM_ParseFunString((COLOR_GREEN<<CON_FGSHIFT), va("^[^%i/%s^]\t", col, cmd), s+con->completionline->length, (con->completionline->maxlength-con->completionline->length)*sizeof(maskedtext[0]), true);
+			var = Cvar_FindVar(cmd);
+			notDefault = var && strcmp(var->string, var->defaultstr);
+			color = notDefault ? S_COLOR_WHITE : S_COLOR_GRAY;
+			varstr = var && con_displaypossibilities.value == 2 ? va("^[%s\"%s\"^]", color, var->string) : "";
+			tabOrReturn = con_displaypossibilities.value == 1 ? "\t" : "\n";
+			
+			end = COM_ParseFunString((COLOR_GREEN<<CON_FGSHIFT), va("^[^%i/%s^] %s%s", col, cmd, varstr, tabOrReturn), s+con->completionline->length, (con->completionline->maxlength-con->completionline->length)*sizeof(maskedtext[0]), true);
 			con->completionline->length = end - s;
 		}
 		if (c->extra)

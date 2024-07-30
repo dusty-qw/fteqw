@@ -502,9 +502,13 @@ void Key_UpdateCompletionDesc(void)
 
 void CompleteCommand (qboolean force, int direction)
 {
+	int i, notDefault;
 	const char	*cmd, *s;
 	const char *desc;
+	char *defaultStr, *varstr;
+	cvar_t *var;
 	cmd_completion_t *c;
+	static char *lasts;
 
 	s = key_lines[edit_line];
 	if (!*s)
@@ -580,6 +584,30 @@ void CompleteCommand (qboolean force, int direction)
 			if (*s == '\\' || *s == '/')
 				s++;
 		}
+	}
+
+	// check if user already tab completed this text fragment
+	if (con_displaypossibilities.value == 3 && (!lasts || strcmp(s, lasts)))
+	{
+		lasts = realloc(lasts, strlen(s) + 1);
+		strcpy(lasts, s);
+
+		for (i = 0; i < c->num; i++)
+		{
+			int col = (con_commandmatch == i+1)?3:2;
+			char *color;
+
+			cmd = c->completions[i].text;
+			var = Cvar_FindVar(cmd);
+			notDefault = var && strcmp(var->string, var->defaultstr);
+			color = notDefault ? S_COLOR_WHITE : S_COLOR_GRAY;
+			varstr = var ? va("%s\"%s\"", color, var->string) : "";
+			defaultStr = notDefault ? "*" : " ";
+
+			Con_Printf(va(S_COLOR_MAGENTA "%s ^[^%i/%s^] %s \n", defaultStr, col, cmd, varstr));		
+		}
+		if (c->extra)
+			Con_Printf(va(S_COLOR_WHITE"%u MORE\n\n", (unsigned)c->extra));
 	}
 
 	con_commandmatch += direction;
